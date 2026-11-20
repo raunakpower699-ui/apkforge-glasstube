@@ -26,8 +26,15 @@ class GlassTubeApp : Application() {
         private set
     lateinit var downloadManager: OfflineDownloadManager
         private set
-    lateinit var syncRepository: FirestoreSyncRepository
-        private set
+    val syncRepository: FirestoreSyncRepository by lazy {
+        FirestoreSyncRepository(
+            context = this,
+            videoDao = database.videoDao(),
+            channelDao = database.channelDao(),
+            pendingSyncDao = database.pendingSyncDao(),
+            preferencesRepository = preferencesRepository
+        )
+    }
     lateinit var playbackController: PlaybackController
         private set
 
@@ -42,13 +49,6 @@ class GlassTubeApp : Application() {
             videoDao = database.videoDao(),
             storageInspector = storageInspector,
             scope = applicationScope
-        )
-        syncRepository = FirestoreSyncRepository(
-            context = this,
-            videoDao = database.videoDao(),
-            channelDao = database.channelDao(),
-            pendingSyncDao = database.pendingSyncDao(),
-            preferencesRepository = preferencesRepository
         )
         playbackController = PlaybackController(this, applicationScope)
 

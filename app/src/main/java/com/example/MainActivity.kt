@@ -3,7 +3,9 @@ package com.example
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -75,6 +77,7 @@ import kotlinx.coroutines.flow.callbackFlow
 
 internal fun FirebaseAuth.authStateFlow(): Flow<FirebaseUser?> = callbackFlow {
     val listener = FirebaseAuth.AuthStateListener { auth ->
+        Log.d("Auth", "AuthStateListener fired: uid=${auth.currentUser?.uid}")
         trySend(auth.currentUser)
     }
     addAuthStateListener(listener)
@@ -110,13 +113,16 @@ private fun AppRootNavigation(
     val user = authFlowUser ?: manualAuthUser
 
     LaunchedEffect(authFlowUser) {
+        Log.d("Auth", "AppRootNavigation observed authFlowUser uid=${authFlowUser?.uid}")
         manualAuthUser = authFlowUser
     }
 
     if (user == null) {
         AuthScreen(
             onAuthSuccess = {
-                manualAuthUser = auth.currentUser
+                val signedIn = auth.currentUser
+                Log.i("Auth", "AppRootNavigation onAuthSuccess triggered (uid=${signedIn?.uid})")
+                manualAuthUser = signedIn
             }
         )
     } else {
@@ -216,6 +222,10 @@ private fun GlassTubeMainHost(
         val msg = snackbarMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg)
         viewModel.clearMessage()
+    }
+
+    BackHandler(enabled = selectedTab != MainTab.HOME && !isPlayerExpanded && !showSettings) {
+        viewModel.selectTab(MainTab.HOME)
     }
 
     LiquidGlassSurface(modifier = Modifier.fillMaxSize()) {

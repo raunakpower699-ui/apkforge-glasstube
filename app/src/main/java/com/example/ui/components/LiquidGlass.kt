@@ -340,21 +340,7 @@ fun Modifier.liquidGlass(
             )
         )
     }
-    val shadowElevation = when {
-        glowHighlighted -> 14.dp
-        elevated -> 10.dp
-        else -> 4.dp
-    }
-    val glowSpotColor = if (glowHighlighted) glass.tapGlowPrimary else glass.glassRefractionTint
-
     return this
-        .shadow(
-            elevation = shadowElevation,
-            shape = shape,
-            clip = false,
-            ambientColor = glowSpotColor.copy(alpha = if (glass.isDark) 0.45f else 0.25f),
-            spotColor = glowSpotColor.copy(alpha = if (glass.isDark) 0.55f else 0.30f)
-        )
         .clip(shape)
         .background(fillBrush, shape)
         .drawWithContent {

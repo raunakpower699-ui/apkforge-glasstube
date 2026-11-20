@@ -80,6 +80,9 @@ jobs:
 
           if [ -f ./debug.keystore ]; then
             echo "Debug keystore already exists at ./debug.keystore; skipping generation."
+          elif [ -f ./debug.keystore.base64 ]; then
+            base64 -d ./debug.keystore.base64 > ./debug.keystore
+            echo "Restored registered debug keystore from ./debug.keystore.base64."
           else
             "$KEYTOOL_BIN" -genkeypair -v \
               -keystore ./debug.keystore \
@@ -93,10 +96,10 @@ jobs:
           fi
 
           if [ ! -f ./debug.keystore ] || [ ! -s ./debug.keystore ]; then
-            echo "::error::Failed to create temporary debug keystore at ./debug.keystore."
+            echo "::error::Failed to prepare debug keystore at ./debug.keystore."
             exit 1
           fi
-          echo "Temporary debug keystore ready."
+          echo "Debug keystore ready."
 
       - name: Build debug APK
         shell: bash

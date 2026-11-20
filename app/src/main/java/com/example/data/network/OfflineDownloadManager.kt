@@ -1,10 +1,12 @@
 package com.example.data.network
 
 import android.content.Context
+import android.util.Log
 import com.example.data.local.VideoDao
 import com.example.model.DownloadQuality
 import com.example.model.DownloadStatus
 import com.example.model.VideoItem
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -111,7 +113,10 @@ class OfflineDownloadManager(
                         cachedOffline = true
                     )
                 }
-            } catch (_: Exception) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("OfflineDownload", "Download failed for ${video.id}: ${e.message}", e)
                 videoDao.updateDownloadState(
                     videoId = video.id,
                     status = DownloadStatus.FAILED.name,

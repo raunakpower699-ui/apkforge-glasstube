@@ -196,7 +196,8 @@ class PlaybackController(
 
     private fun resolvePlayableUri(video: VideoItem, isOnline: Boolean): String {
         val local = video.localFilePath
-        if (isLocalFileReady(local)) {
+        val isBundledFallback = local?.startsWith("android.resource://") == true
+        if (isLocalFileReady(local) && (!isOnline || !isBundledFallback)) {
             return local!!
         }
         if (!isOnline && !local.isNullOrBlank()) {

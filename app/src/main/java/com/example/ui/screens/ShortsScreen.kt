@@ -100,9 +100,14 @@ fun ShortsScreen(
     val commentsMap = remember { mutableStateListOf("Pure liquid glass vibes!", "Works smoothly even offline in 4K!") }
     val context = LocalContext.current
 
+    var lastTriggeredShortId by remember { mutableStateOf<String?>(null) }
+
     LaunchedEffect(pagerState.currentPage, shorts) {
         val current = shorts.getOrNull(pagerState.currentPage) ?: return@LaunchedEffect
-        onPlayShort(current)
+        if (current.id != lastTriggeredShortId) {
+            lastTriggeredShortId = current.id
+            onPlayShort(current)
+        }
     }
 
     VerticalPager(
