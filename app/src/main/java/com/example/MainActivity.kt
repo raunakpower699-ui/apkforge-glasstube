@@ -104,12 +104,21 @@ private fun AppRootNavigation(
     themeMode: ThemeMode,
     auth: FirebaseAuth = Firebase.auth
 ) {
-    val currentUser by auth.authStateFlow()
+    val authFlowUser by auth.authStateFlow()
         .collectAsStateWithLifecycle(initialValue = auth.currentUser)
-    val user = currentUser
+    var manualAuthUser by remember { mutableStateOf(auth.currentUser) }
+    val user = authFlowUser ?: manualAuthUser
+
+    LaunchedEffect(authFlowUser) {
+        manualAuthUser = authFlowUser
+    }
 
     if (user == null) {
-        AuthScreen(onAuthSuccess = {})
+        AuthScreen(
+            onAuthSuccess = {
+                manualAuthUser = auth.currentUser
+            }
+        )
     } else {
         key(user.uid) {
             val context = LocalContext.current
