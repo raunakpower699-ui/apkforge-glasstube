@@ -1,0 +1,160 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 60 &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 120)) &&
+             data.preferredTopics is list && data.preferredTopics.size() <= 15 &&
+             (data.preferredTopics.size() == 0 || data.preferredTopics[0] is string) &&
+             data.themeMode in ['SYSTEM', 'DARK', 'LIGHT'] &&
+             data.backgroundPlay is bool &&
+             data.backgroundDataPlay is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidVideoState(data, userId, videoId) {
+      return data.userId is string && data.userId == userId &&
+             data.videoId is string && data.videoId == videoId && data.videoId.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 40 &&
+             data.liked is bool &&
+             data.saved is bool &&
+             data.watchCount is int && data.watchCount >= 0 && data.watchCount <= 1000000 &&
+             data.lastPositionMs is int && data.lastPositionMs >= 0 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidSubscription(data, userId, channelId) {
+      return data.userId is string && data.userId == userId &&
+             data.channelId is string && data.channelId == channelId && data.channelId.size() <= 128 &&
+             data.channelName is string && data.channelName.size() >= 1 && data.channelName.size() <= 80 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 40 &&
+             data.subscribed is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidCustomVideo(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+             data.channelName is string && data.channelName.size() >= 1 && data.channelName.size() <= 80 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 40 &&
+             data.streamUrl is string && data.streamUrl.size() >= 1 && data.streamUrl.size() <= 500 &&
+             data.durationSec is int && data.durationSec >= 0 && data.durationSec <= 86400 &&
+             data.shortVideo is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'preferredTopics', 'themeMode', 'backgroundPlay', 'backgroundDataPlay', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'preferredTopics', 'themeMode', 'backgroundPlay', 'backgroundDataPlay', 'createdAt', 'updatedAt']) &&
+                       isValidUserProfile(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'preferredTopics', 'themeMode', 'backgroundPlay', 'backgroundDataPlay', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      match /videoStates/{videoId} {
+        allow get: if isOwner(userId) && isValidId(videoId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(videoId) &&
+                         incoming().keys().hasAll(['userId', 'videoId', 'title', 'category', 'liked', 'saved', 'watchCount', 'lastPositionMs', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'videoId', 'title', 'category', 'liked', 'saved', 'watchCount', 'lastPositionMs', 'createdAt', 'updatedAt']) &&
+                         isValidVideoState(incoming(), userId, videoId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(videoId) &&
+                         isValidVideoState(incoming(), userId, videoId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().videoId == existing().videoId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'liked', 'saved', 'watchCount', 'lastPositionMs', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(videoId);
+      }
+
+      match /subscriptions/{channelId} {
+        allow get: if isOwner(userId) && isValidId(channelId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(channelId) &&
+                         incoming().keys().hasAll(['userId', 'channelId', 'channelName', 'category', 'subscribed', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'channelId', 'channelName', 'category', 'subscribed', 'createdAt', 'updatedAt']) &&
+                         isValidSubscription(incoming(), userId, channelId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(channelId) &&
+                         isValidSubscription(incoming(), userId, channelId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().channelId == existing().channelId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['channelName', 'category', 'subscribed', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(channelId);
+      }
+
+      match /customVideos/{videoId} {
+        allow get: if isOwner(userId) && isValidId(videoId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(videoId) &&
+                         incoming().keys().hasAll(['userId', 'title', 'channelName', 'category', 'streamUrl', 'durationSec', 'shortVideo', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'channelName', 'category', 'streamUrl', 'durationSec', 'shortVideo', 'createdAt', 'updatedAt']) &&
+                         isValidCustomVideo(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(videoId) &&
+                         isValidCustomVideo(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'channelName', 'category', 'streamUrl', 'durationSec', 'shortVideo', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(videoId);
+      }
+    }
+  }
+}

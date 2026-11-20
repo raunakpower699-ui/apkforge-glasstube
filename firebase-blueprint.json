@@ -1,0 +1,241 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile, theme mode, playback preferences, and topic affinities.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name."
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address."
+        },
+        "preferredTopics": {
+          "type": "array",
+          "description": "List of preferred video categories learned from watch history."
+        },
+        "themeMode": {
+          "type": "string",
+          "enum": ["SYSTEM", "DARK", "LIGHT"],
+          "description": "Selected app appearance mode."
+        },
+        "backgroundPlay": {
+          "type": "boolean",
+          "description": "Whether background media playback is enabled."
+        },
+        "backgroundDataPlay": {
+          "type": "boolean",
+          "description": "Whether background playback over cellular data is enabled."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on profile creation (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on profile update (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "preferredTopics",
+        "themeMode",
+        "backgroundPlay",
+        "backgroundDataPlay",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "VideoState": {
+      "title": "VideoState",
+      "description": "Per-user engagement state (likes, saved status, watch count, playback position) for a video.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "videoId": {
+          "type": "string",
+          "description": "Video identifier matching document ID."
+        },
+        "title": {
+          "type": "string",
+          "description": "Video title."
+        },
+        "category": {
+          "type": "string",
+          "description": "Video category for personalized recommendations."
+        },
+        "liked": {
+          "type": "boolean",
+          "description": "Whether the user liked this video."
+        },
+        "saved": {
+          "type": "boolean",
+          "description": "Whether the user saved this video to library."
+        },
+        "watchCount": {
+          "type": "integer",
+          "description": "Total number of times watched."
+        },
+        "lastPositionMs": {
+          "type": "integer",
+          "description": "Last playback position in milliseconds."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on creation (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on update (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "videoId",
+        "title",
+        "category",
+        "liked",
+        "saved",
+        "watchCount",
+        "lastPositionMs",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ChannelSubscription": {
+      "title": "ChannelSubscription",
+      "description": "Per-user channel subscription state.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "channelId": {
+          "type": "string",
+          "description": "Channel identifier matching document ID."
+        },
+        "channelName": {
+          "type": "string",
+          "description": "Display name of the channel."
+        },
+        "category": {
+          "type": "string",
+          "description": "Primary topic category of the channel."
+        },
+        "subscribed": {
+          "type": "boolean",
+          "description": "Whether the user is currently subscribed."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on creation (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on update (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "channelId",
+        "channelName",
+        "category",
+        "subscribed",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CustomVideo": {
+      "title": "CustomVideo",
+      "description": "User-imported or custom video entry synced across devices.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "title": {
+          "type": "string",
+          "description": "Video title."
+        },
+        "channelName": {
+          "type": "string",
+          "description": "Creator or channel name."
+        },
+        "category": {
+          "type": "string",
+          "description": "Topic category."
+        },
+        "streamUrl": {
+          "type": "string",
+          "description": "Playable stream or local reference URI."
+        },
+        "durationSec": {
+          "type": "integer",
+          "description": "Video duration in seconds."
+        },
+        "shortVideo": {
+          "type": "boolean",
+          "description": "Whether this item belongs in the Shorts feed."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on creation (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on update (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "channelName",
+        "category",
+        "streamUrl",
+        "durationSec",
+        "shortVideo",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profile and personalized recommendation preferences."
+    },
+    "/users/{userId}/videoStates/{videoId}": {
+      "schema": { "$ref": "#/entities/VideoState" },
+      "description": "Per-user video likes, saves, and watch history."
+    },
+    "/users/{userId}/subscriptions/{channelId}": {
+      "schema": { "$ref": "#/entities/ChannelSubscription" },
+      "description": "Per-user channel subscriptions."
+    },
+    "/users/{userId}/customVideos/{videoId}": {
+      "schema": { "$ref": "#/entities/CustomVideo" },
+      "description": "Per-user imported or added videos."
+    }
+  }
+}

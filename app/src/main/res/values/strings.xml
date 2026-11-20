@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">GlassTube</string>
+    <string name="tab_home">Home</string>
+    <string name="tab_shorts">Shorts</string>
+    <string name="tab_create">Create</string>
+    <string name="tab_subscriptions">Subscriptions</string>
+    <string name="tab_you">You</string>
+    <string name="sign_in_title">Connect Your YouTube &amp; Google Account</string>
+    <string name="sign_in_subtitle">Sync watch preferences, subscriptions, and offline queues seamlessly when your connection is restored.</string>
+    <string name="sign_in_button">Sign in with Google</string>
+    <string name="ad_free_badge">Ad-Free Shield Active</string>
+    <string name="offline_ready_badge">Offline Ready</string>
+    <string name="cd_notifications">Notifications</string>
+    <string name="cd_search">Search videos</string>
+    <string name="cd_settings">Settings</string>
+    <string name="cd_back">Navigate back</string>
+    <string name="cd_play_pause">Play or pause</string>
+    <string name="cd_download_4k">Download in 4K</string>
+    <string name="cd_like_video">Like video</string>
+    <string name="cd_save_video">Save video</string>
+    <string name="cd_minimize_island">Minimize to Dynamic Island</string>
+</resources>

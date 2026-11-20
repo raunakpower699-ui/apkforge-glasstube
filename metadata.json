@@ -1,0 +1,6 @@
+{
+  "name": "GlassTube",
+  "description": "Liquid glass ad-free video streaming app with 4K offline downloads, background playback, Dynamic Island media pill, and account sync.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
