@@ -3,7 +3,10 @@ package com.example.ui.auth
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
+import java.security.MessageDigest
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -55,6 +58,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -98,10 +102,11 @@ fun AuthScreen(
     val credentialManager = remember { CredentialManager.create(context) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var autoSignInJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val glass = LocalGlassPalette.current
 
     LaunchedEffect(Unit) {
-        attemptAutoSignIn(
+        autoSignInJob = attemptAutoSignIn(
             context = context,
             credentialManager = credentialManager,
             onAuthSuccess = onAuthSuccess,
@@ -221,11 +226,13 @@ fun AuthScreen(
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(20.dp)
                             )
-                            Text(
-                                text = errorMessage!!,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                            SelectionContainer {
+                                Text(
+                                    text = errorMessage!!,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
                     }
                 }
@@ -241,6 +248,8 @@ fun AuthScreen(
                 ) {
                     Button(
                         onClick = {
+                            autoSignInJob?.cancel()
+                            autoSignInJob = null
                             isLoading = true
                             errorMessage = null
                             onGoogleSignInClicked(
@@ -255,9 +264,9 @@ fun AuthScreen(
                                     errorMessage = msg
                                 },
                                 scope = scope,
-                                onAuthCancelled = {
+                                onAuthCancelled = { detail ->
                                     isLoading = false
-                                    errorMessage = "Sign-in was cancelled. Tap Sign in with Google and select your account again (if you previously installed an older APK build, uninstall it once before installing the latest APK)."
+                                    errorMessage = detail
                                 }
                             )
                         },
@@ -351,6 +360,37 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 }
 
 private const val AUTH_TAG = "Auth"
+private const val EXPECTED_FIREBASE_SHA1 = "15:DE:E3:89:BA:6E:E5:19:77:38:2D:1A:AC:E9:53:00:6A:06:44:19"
+
+private fun getAppSigningSha1(context: Context): String? = try {
+    val pkgInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        context.packageManager.getPackageInfo(
+            context.packageName,
+            PackageManager.GET_SIGNING_CERTIFICATES
+        )
+    } else {
+        @Suppress("DEPRECATION")
+        context.packageManager.getPackageInfo(
+            context.packageName,
+            PackageManager.GET_SIGNATURES
+        )
+    }
+    val sig = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        val signingInfo = pkgInfo.signingInfo
+        signingInfo?.apkContentsSigners?.firstOrNull()
+            ?: signingInfo?.signingCertificateHistory?.firstOrNull()
+    } else {
+        @Suppress("DEPRECATION")
+        pkgInfo.signatures?.firstOrNull()
+    }
+    sig?.let {
+        val digest = MessageDigest.getInstance("SHA-1").digest(it.toByteArray())
+        digest.joinToString(":") { byte -> "%02X".format(byte) }
+    }
+} catch (e: Exception) {
+    Log.w(AUTH_TAG, "Unable to read runtime APK SHA-1: ${e.message}")
+    null
+}
 
 fun attemptAutoSignIn(
     context: Context,
@@ -358,30 +398,30 @@ fun attemptAutoSignIn(
     onAuthSuccess: () -> Unit,
     onUnauthenticated: () -> Unit,
     scope: CoroutineScope
-) {
+): kotlinx.coroutines.Job? {
     val existingUser = Firebase.auth.currentUser
     if (existingUser != null) {
         Log.d(AUTH_TAG, "attemptAutoSignIn: Firebase user already signed in (uid=${existingUser.uid})")
         onAuthSuccess()
-        return
+        return null
     }
     val activity = context.findActivity()
     if (activity == null) {
         Log.w(AUTH_TAG, "attemptAutoSignIn: Unable to resolve Activity from context")
         onUnauthenticated()
-        return
+        return null
     }
     val clientId = try {
         context.getString(R.string.default_web_client_id).trim()
     } catch (e: Exception) {
         Log.e(AUTH_TAG, "attemptAutoSignIn: Missing R.string.default_web_client_id", e)
         onUnauthenticated()
-        return
+        return null
     }
     if (clientId.isBlank()) {
         Log.e(AUTH_TAG, "attemptAutoSignIn: R.string.default_web_client_id is blank")
         onUnauthenticated()
-        return
+        return null
     }
 
     val googleIdOption = GetGoogleIdOption.Builder()
@@ -393,7 +433,7 @@ fun attemptAutoSignIn(
         .addCredentialOption(googleIdOption)
         .build()
 
-    scope.launch {
+    return scope.launch {
         try {
             Log.d(AUTH_TAG, "attemptAutoSignIn: Requesting authorized Google credential (clientId=${clientId.take(18)}...)")
             val result = credentialManager.getCredential(activity, request)
@@ -447,7 +487,7 @@ fun onGoogleSignInClicked(
     onAuthSuccess: () -> Unit,
     onAuthError: (String) -> Unit,
     scope: CoroutineScope,
-    onAuthCancelled: () -> Unit = {}
+    onAuthCancelled: (String) -> Unit = {}
 ) {
     Log.d(AUTH_TAG, "onGoogleSignInClicked: Starting interactive Google Sign-In flow")
     val activity = context.findActivity()
@@ -524,13 +564,21 @@ fun onGoogleSignInClicked(
         } catch (e: CancellationException) {
             throw e
         } catch (e: GetCredentialCancellationException) {
+            val runtimeSha1 = getAppSigningSha1(context)
+            val shaNote = when {
+                runtimeSha1 == null -> ""
+                runtimeSha1.equals(EXPECTED_FIREBASE_SHA1, ignoreCase = true) ->
+                    "APK SHA-1 verified ($runtimeSha1). Ensure Firebase Auth -> Google provider is enabled and Google Cloud OAuth Consent Screen is Published (or your email is added as a Test User)."
+                else ->
+                    "APK SHA-1 mismatch! Installed APK SHA-1 is $runtimeSha1 (expected $EXPECTED_FIREBASE_SHA1). Register $runtimeSha1 in Firebase Console -> Project Settings."
+            }
+            val reason = e.message?.takeIf { it.isNotBlank() } ?: e.type
             Log.w(
                 AUTH_TAG,
-                "Google Sign-In flow cancelled or dismissed (type=${e.type}, message=${e.message}). " +
-                    "If user selected an email and this fired immediately, verify APK signing SHA-1 matches Firebase google-services.json.",
+                "Google Sign-In flow cancelled (reason=$reason, runtimeSha1=$runtimeSha1)",
                 e
             )
-            onAuthCancelled()
+            onAuthCancelled("Google Sign-In cancelled ($reason). $shaNote".trim())
         } catch (e: NoCredentialException) {
             Log.w(AUTH_TAG, "onGoogleSignInClicked: NoCredentialException (type=${e.type}, msg=${e.message})", e)
             onAuthError("No Google account found on this device. Please add your Google/YouTube account in Android Settings -> Accounts and try again.")
@@ -544,7 +592,8 @@ fun onGoogleSignInClicked(
             Log.e(AUTH_TAG, "onGoogleSignInClicked: Credential Manager unsupported (type=${e.type}, msg=${e.message})", e)
             onAuthError("Credential Manager Google Sign-In is not supported on this device/Play Services version.")
         } catch (e: GetCredentialException) {
-            Log.e(AUTH_TAG, "onGoogleSignInClicked: CredentialManager failure type=${e.type}, msg=${e.message}", e)
+            val runtimeSha1 = getAppSigningSha1(context)
+            Log.e(AUTH_TAG, "onGoogleSignInClicked: CredentialManager failure type=${e.type}, msg=${e.message}, sha1=$runtimeSha1", e)
             onAuthError(e.localizedMessage ?: "Google Sign-In failed (${e.type}).")
         } catch (e: FirebaseAuthException) {
             Log.e(AUTH_TAG, "onGoogleSignInClicked: FirebaseAuthException code=${e.errorCode}, msg=${e.message}", e)

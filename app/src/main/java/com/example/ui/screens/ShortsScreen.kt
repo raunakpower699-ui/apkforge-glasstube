@@ -100,7 +100,11 @@ fun ShortsScreen(
     val commentsMap = remember { mutableStateListOf("Pure liquid glass vibes!", "Works smoothly even offline in 4K!") }
     val context = LocalContext.current
 
-    var lastTriggeredShortId by remember { mutableStateOf<String?>(null) }
+    var lastTriggeredShortId by remember {
+        mutableStateOf(
+            if (activeVideoId != null && shorts.any { it.id == activeVideoId }) activeVideoId else null
+        )
+    }
 
     LaunchedEffect(pagerState.currentPage, shorts) {
         val current = shorts.getOrNull(pagerState.currentPage) ?: return@LaunchedEffect
